@@ -1,0 +1,108 @@
+
+This combine joson data correctly
+
+------------------------------------------------------------------------------------------------------------------------------
+
+import json
+
+# Load the quarterly JSON files
+q1_data = json.load(open('D:/GIT/pulse/data/top/transaction/country/india/2018/1.json'))
+q2_data = json.load(open('D:/GIT/pulse/data/top/transaction/country/india/2018/2.json'))
+q3_data = json.load(open('D:/GIT/pulse/data/top/transaction/country/india/2018/3.json'))
+q4_data = json.load(open('D:/GIT/pulse/data/top/transaction/country/india/2018/4.json'))
+
+# Create a dictionary to store the aggregated data
+state_data = {}
+
+# Loop over the states in the quarterly data and add up the amounts
+for quarter_data in [q1_data, q2_data, q3_data, q4_data]:
+    for state in quarter_data['data']['states']:
+        state_name = state['entityName']
+        amount = state['metric']['amount']
+        if state_name in state_data:
+            state_data[state_name] += amount
+        else:
+            state_data[state_name] = amount
+
+# Create the aggregated data JSON object
+aggregated_data = {
+    "success": True,
+    "code": "SUCCESS",
+    "data": {
+        "states": [
+            {
+                "entityName": state_name,
+                "metric": {
+                    "type": "TOTAL",
+                    "count": 0,  # Not used in the example data
+                    "amount": amount
+                }
+            } for state_name, amount in state_data.items()
+        ]
+    }
+}
+
+# Write the aggregated data to a new JSON file
+with open('aggregated.json', 'w') as f:
+    json.dump(aggregated_data, f)
+    
+    
+------------------------------------------------------------------------------------------------------------------------------
+
+Final Map
+
+------------------------------------------------------------------------------------------------------------------------------
+
+import json
+import folium
+from branca.colormap import LinearColormap
+
+# Load the GeoJSON data
+with open('india_state.geojson') as f:
+    geojson_data = json.load(f)
+
+# Load the state data for registered users
+with open('finalstatedata.json') as f:
+    state_data = json.load(f)['data']['states']
+
+# Load the state data for amount transferred
+with open('aggregated.json') as f:
+    aggregated_data = json.load(f)['data']['states']
+
+# Create a dictionary with state names and registered users
+state_dict = {state['name'].title(): state['registeredUsers'] for state in state_data}
+
+# Create a dictionary with state names and amount transferred
+aggregated_dict = {state['entityName'].title(): state['metric']['amount'] for state in aggregated_data}
+
+# Join the state data with the GeoJSON data
+for feature in geojson_data['features']:
+    state_name = feature['properties']['NAME_1'].title()
+    feature['properties']['registeredUsers'] = state_dict.get(state_name, 0)
+    feature['properties']['amountTransferred'] = aggregated_dict.get(state_name, 0)
+
+# Create a color map based on the registered users
+registered_users = [state_dict.get(feature['properties']['NAME_1'].title(), 0) for feature in geojson_data['features']]
+color_map = LinearColormap(['green', 'yellow', 'red'], vmin=min(registered_users), vmax=max(registered_users))
+
+# Create a Folium map
+m = folium.Map(location=[20.5937, 78.9629], zoom_start=4)
+
+# Add GeoJson layer to the map
+folium.GeoJson(
+    geojson_data,
+    name='choropleth',
+    style_function=lambda x: {'fillColor': color_map(x['properties']['registeredUsers']), 'fillOpacity': 0.7, 'color': 'black', 'weight': 0.2},
+    tooltip=folium.GeoJsonTooltip(
+        fields=['NAME_1', 'registeredUsers', 'amountTransferred'],
+        aliases=['State', 'Registered Users', 'Amount Transferred'],
+        style=('background-color: grey; color: white; font-family: arial; font-size: 12px; padding: 10px;')
+    ),
+    highlight_function=lambda x: {'weight': 3, 'fillOpacity': 0.5},
+).add_to(m)
+
+# Add layer control to the map
+folium.LayerControl().add_to(m)
+
+# Display the map
+m

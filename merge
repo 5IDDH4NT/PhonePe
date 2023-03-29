@@ -1,0 +1,28 @@
+import os
+import json
+
+data = {
+    "success": True,
+    "code": "SUCCESS",
+    "data": {
+        "states": [],
+        "districts": [],
+        "pincodes": []
+    },
+    "responseTimestamp": 1630501482414
+}
+
+# iterate over each JSON file in the directory
+for file_name in os.listdir("D:/GIT/pulse/data/top/user/country/india/2022"):
+    if file_name.endswith(".json"):
+        with open(os.path.join("D:/GIT/pulse/data/top/user/country/india/2022", file_name)) as f:
+            # load the data from the file
+            json_data = json.load(f)
+            # append the "states", "districts" and "pincodes" data to the main "data" dictionary
+            data["data"]["states"].extend(json_data["data"]["states"])
+            data["data"]["districts"].extend(json_data["data"]["districts"])
+            data["data"]["pincodes"].extend(json_data["data"]["pincodes"])
+
+# write the combined data to a new JSON file
+with open("1statedata.json", "w") as f:
+    json.dump(data, f)
